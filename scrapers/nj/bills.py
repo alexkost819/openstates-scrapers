@@ -394,6 +394,14 @@ class NJBillScraper(Scraper, MDBMixin):
         ]
         # keep votes clean globally, a few votes show up in multiple files
         votes = {}
+        # each vote_info_list filename has a companion "...End.txt" file;
+        # for older sessions that file held only supplemental records, but
+        # for current sessions it duplicates the whole roll already read
+        # from the base file, so guard against recording the same
+        # legislator's vote on the same vote_id twice; maps
+        # (vote_id, legislator) -> the vote cast, so a conflicting repeat
+        # (same voter, different vote) can be told apart from a true dupe
+        recorded_voters = {}
 
         for filename in vote_info_list:
             s_vote_url = f"https://pub.njleg.state.nj.us/votes/{filename}.zip"
@@ -469,6 +477,16 @@ class NJBillScraper(Scraper, MDBMixin):
                                 bill=bill_dict[bill_id],
                             )
                             votes[vote_id].dedupe_key = vote_id
+                        voter_key = (vote_id, leg)
+                        if voter_key in recorded_voters:
+                            if recorded_voters[voter_key] != leg_vote:
+                                self.warning(
+                                    f"Conflicting votes for {leg} on "
+                                    f"{vote_id}: {recorded_voters[voter_key]} "
+                                    f"vs {leg_vote}, keeping first"
+                                )
+                            continue
+                        recorded_voters[voter_key] = leg_vote
                         if leg_vote == "Y":
                             votes[vote_id].vote("yes", leg)
                         elif leg_vote == "N":

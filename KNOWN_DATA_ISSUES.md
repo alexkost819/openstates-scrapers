@@ -366,7 +366,7 @@ other but its 384-entry roll itemizes only 179 yes / 151 no / 54 other:
 Also produces a literal duplicate vote-event record — see the
 [Duplicate vote-event records](#duplicate-vote-event-records) section.
 
-## NJ
+## NJ — FIXED
 
 **Whole roll duplicated within one record.** From
 `NJ/221/NJ_221_bills.json`, a vote declares 49 yes / 29 no / 2 other (80
@@ -391,6 +391,40 @@ distinct legislators):
   ]
 }
 ```
+
+**Fixed.** `scrape_bills` in `scrapers/nj/bills.py` records votes from
+each session's vote-info files (a base `{filename}.txt` plus, for recent
+sessions, a companion `{filename}End.txt`) into one shared `votes` dict.
+`vote_id` is built from `(bill_id, chamber, action)` without a date, and
+a legislator's vote was recorded unconditionally on every matching row —
+so any row processed twice for the same `vote_id` (whether from the two
+files overlapping, or any other source-side repeat) doubled that
+legislator's vote and the roll. Added a `recorded_voters` guard keyed on
+`(vote_id, legislator)`, mapping to the vote cast so a same-value repeat
+(true duplicate) can be told apart from a conflicting one: a matching
+repeat is silently dropped, but if the second row records a different
+vote for the same legislator on the same `vote_id`, that's a genuine
+source conflict, logged as a warning with the first kept rather than
+silently overwritten or arbitrarily chosen.
+
+Verified two ways against the live NJ vote-file feed
+(`pub.njleg.state.nj.us/votes/*.zip`): (1) replaying the actual current
+`A2025.txt`/`A2025End.txt` pair (40,240 + 12,240 real rows) through the
+scraper's own vote-recording logic shows the dedupe guard is not a no-op
+on live data — of 160 duplicate `(vote_id, legislator)` rows, 153 are
+true same-value repeats (silently collapsed) and 7 are genuine conflicts
+(same legislator, same vote_id, different `Legislator_Vote` between the
+base and `End` file — mostly one side blank and the other `Y`/`A`, e.g.
+`A6319_..._MOTION` / "Freiman, Roy": `'Y'` vs `''`). Those 7 now log a
+warning and keep the first-seen value instead of being silently
+overwritten — which side is more "correct" isn't decidable from this data
+alone (the blank sometimes comes first, sometimes second), so this is
+exactly the kind of source conflict that needs a human/upstream look, not
+an automatic guess. (2) a synthetic doubled-file case (reusing one real
+bill's 10 rows as its own "End" duplicate) confirms the guard collapses
+20 roll entries back to the correct 10, and a separate synthetic
+conflicting-vote case confirms that shape is warned about rather than
+silently dropped.
 
 ## NM
 
