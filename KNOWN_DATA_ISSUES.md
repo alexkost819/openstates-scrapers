@@ -471,7 +471,7 @@ Declared `counts` vs. roll disagree by 1. From
 `OK/2025/OK_2025_bills.json`: declares zero "other" votes, roll itemizes
 1.
 
-## OR
+## OR — FIXED
 
 **Whole roll duplicated within one record.** Every sampled OR mismatch in
 this run (242 of 242) showed this pattern. From
@@ -493,6 +493,25 @@ distinct legislators):
   ]
 }
 ```
+
+**Fixed.** Both `add_individual_votes` and `tally_votes` in
+`scrapers/or/votes.py` consumed `event["MeasureVotes"]` /
+`event["CommitteeVotes"]` directly from the OData `$expand` response;
+added a `dedupe_votes` helper (by `VoteName`) called once on that list
+before either function reads it, so both the tally and the roll agree.
+The dedup checks the vote option (`Vote` for measures, `Meaning` for
+committee actions), not just the name: a true duplicate row (same
+legislator, same option) is silently collapsed, but if the two rows
+disagree on the vote cast, that's a genuine source conflict, so it's
+logged as a warning and the first is kept rather than picking one with no
+record of the disagreement. Live queries against
+`api.oregonlegislature.gov`'s OData endpoint for a small sample of
+2025R1 measures didn't currently reproduce a doubled roll, so this was
+verified with a standalone script constructing the documented shape by
+hand (23 distinct legislators each appearing twice, 46 entries),
+confirming the dedupe collapses it back to 23 with no conflict warnings,
+plus a synthetic case confirming a genuine option conflict is warned
+about rather than silently dropped.
 
 ## PA
 

@@ -10,6 +10,29 @@ from .utils import index_legislators, get_timezone, SESSION_KEYS
 logger = logging.getLogger("openstates")
 
 
+def dedupe_votes(vote_call, option_field, logger_):
+    # the OData API's nested $expand occasionally fans out the same
+    # legislator's vote twice within one measure/committee vote; keep the
+    # first occurrence so counts and the roll stay consistent. If the two
+    # rows actually disagree on the vote cast, that's a genuine source
+    # conflict we can't silently resolve -- warn instead of picking one
+    # arbitrarily.
+    seen = {}
+    deduped = []
+    for voter in vote_call:
+        name = voter["VoteName"]
+        if name in seen:
+            if seen[name] != voter[option_field]:
+                logger_.warning(
+                    f"Conflicting votes for {name}: "
+                    f"{seen[name]} vs {voter[option_field]}, keeping first"
+                )
+            continue
+        seen[name] = voter[option_field]
+        deduped.append(voter)
+    return deduped
+
+
 class ORVoteScraper(Scraper):
     tz = get_timezone()
     chamber_code = {"S": "upper", "H": "lower", "J": "legislature"}
@@ -56,6 +79,9 @@ class ORVoteScraper(Scraper):
             measure_history = measure["MeasureHistoryActions"]
             for event in measure_history:
                 if event["MeasureVotes"]:
+                    event["MeasureVotes"] = dedupe_votes(
+                        event["MeasureVotes"], "Vote", logger
+                    )
                     tally = self.tally_votes(event, "measure")
                     passed = self.passed_vote(tally)
 
@@ -97,6 +123,9 @@ class ORVoteScraper(Scraper):
             committee_history = measure["CommitteeAgendaItems"]
             for event in committee_history:
                 if event["CommitteeVotes"]:
+                    event["CommitteeVotes"] = dedupe_votes(
+                        event["CommitteeVotes"], "Meaning", logger
+                    )
                     tally = self.tally_votes(event, "committee")
                     passed = self.passed_vote(tally)
 
