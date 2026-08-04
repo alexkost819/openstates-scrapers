@@ -537,7 +537,7 @@ array with exactly one entry — the single "not voting" member:
 No yes/no voters are ever itemized in TN, only exceptions. Every TN
 mismatch we sampled followed this same pattern.
 
-## TX
+## TX — PARTIALLY FIXED
 
 Three distinct issues:
 
@@ -573,6 +573,22 @@ TX has multiple Representatives surnamed Harris, disambiguated with a
 parenthetical first name elsewhere in the archive (e.g. `"Bell, C."`) —
 here `"Harris(C"` is truncated mid-parenthesis, and `"Lopez"` / `"J"`
 look like the same truncation splitting a `"Lopez, J."` entry in two.
+
+**Fixed** (garbled/truncated names issue only; the partial-roll issue is a
+source-data gap — the site itself never furnishes the winning side, so
+there's nothing to fix in the scraper). Two bugs in `names()` in
+`scrapers/tx/votes.py`: (1) it blindly sliced off the last character of
+the final name in a roll assuming it was always a trailing `"."`, which
+truncated names ending in anything else, e.g. `"Harris(C)"` ->
+`"Harris(C"`; now it only strips a trailing `"."`. (2) the comma-fallback
+split (used when a roll has fewer than 7 semicolon-separated entries)
+fragmented a middle initial into its own entry, e.g. `"Lopez, J."` ->
+`"Lopez"`, `"J"`; now, as in HI above, a bare-initial fragment is merged
+back into the preceding name. Verified with a standalone script (`names()`
+copied out, no repo deps needed) against both the semicolon and
+comma-fallback code paths using the documented `"Bell, C.; Harris(C);
+Lopez, J."`-style input: output is now `["Bell, C", "Harris(C)", "Lopez,
+J"]` in both paths, with no bare `"J"` or truncated `"Harris(C"` entries.
 
 Also produces a literal duplicate vote-event record — see the
 [Duplicate vote-event records](#duplicate-vote-event-records) section.

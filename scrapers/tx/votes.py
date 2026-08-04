@@ -120,10 +120,23 @@ def names(el):
     if names:
         # First item in the list will have stuff to ignore before an mdash
         names[0] = clean_starting_name(names[0]).strip()
-        # Get rid of trailing '.'
-        names[-1] = names[-1][0:-1]
+        # Get rid of trailing '.', if present (blindly slicing the last
+        # char truncates names that legitimately end in something else,
+        # e.g. "Harris(C)" -> "Harris(C")
+        if names[-1].endswith("."):
+            names[-1] = names[-1][:-1]
 
-    return names
+    # a bare initial (e.g. "Lopez, J." comma-split into "Lopez" and "J")
+    # can never be a standalone surname, so merge it back into the name
+    # before it
+    merged = []
+    for name in names:
+        if merged and re.fullmatch(r"[A-Z]\.?", name):
+            merged[-1] = f"{merged[-1]}, {name}"
+        else:
+            merged.append(name)
+
+    return merged
 
 
 def clean_name_special_cases(name):
