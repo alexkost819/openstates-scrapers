@@ -276,7 +276,7 @@ Same pattern as NY, MT, NJ, and OR below.
 Produces a literal duplicate vote-event record — see the
 [Duplicate vote-event records](#duplicate-vote-event-records) section.
 
-## MT
+## MT — FIXED
 
 **Whole roll duplicated within one record.** From
 `MT/2025/MT_2025_bills.json`, a vote declares 42 yes with a 42-entry roll
@@ -309,6 +309,24 @@ Note this record's own `counts` (42) already reflects the doubled total,
 not the real headcount — the duplication runs through both fields
 consistently, which is why it doesn't surface as a "Vote count mismatch"
 (both sides of the comparison are doubled by the same amount).
+
+**Fixed.** `scrape_votes_page` in `scrapers/mt/bills.py` now dedupes
+`row["legislatorVotes"]` by legislator id before either tallying `counts`
+or building the roll, so a legislator can't be counted or voted twice for
+the same record regardless of whether the duplication originates from the
+API. This is a same-value dedup, not a blind first-wins: if the two rows
+for one legislator disagree on the vote cast, that's a genuine source
+conflict we can't silently resolve, so the scraper logs a warning and
+keeps the first instead of picking one arbitrarily with no record of the
+disagreement. Live queries against
+`api.legmt.gov/bills/v1/votes/findByBillId` for bill ids 1-2500 didn't
+currently reproduce a doubled roll (upstream may have since deduped, or
+the archived example is from an older session range), so this was
+verified with a standalone script constructing the documented shape by
+hand — 21 distinct legislators each appearing twice (42 entries) — and
+confirming the dedupe collapses it back to 21 with no conflict warnings
+(true duplicates, not disagreements), plus a synthetic case confirming a
+genuine option conflict is warned about rather than silently dropped.
 
 ## NC
 

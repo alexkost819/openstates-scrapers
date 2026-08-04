@@ -497,6 +497,33 @@ class MTBillScraper(Scraper):
             # https://api.legmt.gov/bills/v1/votes/findByBillId?billId=2308
             motion = row["motion"] if row["motion"] else "Unknown"
 
+            # source occasionally lists the same legislator's vote twice
+            # within one vote's legislatorVotes; dedupe by legislator so
+            # counts and the roll agree, first occurrence wins. If the two
+            # rows actually disagree on the vote cast, that's a genuine
+            # source conflict we can't silently resolve -- warn instead of
+            # picking one arbitrarily.
+            seen_leg_votes = {}
+            deduped_legislator_votes = []
+            for v in row["legislatorVotes"]:
+                leg_id = (
+                    v["legislatorId"]
+                    if "legislatorId" in v
+                    else v["membership"]["legislatorId"]
+                )
+                vote_type_key = "voteType" if "voteType" in v else "committeeVote"
+                if leg_id in seen_leg_votes:
+                    if seen_leg_votes[leg_id] != v[vote_type_key]:
+                        self.warning(
+                            f"Conflicting votes for legislator {leg_id} on "
+                            f"{vote_url}: {seen_leg_votes[leg_id]} vs "
+                            f"{v[vote_type_key]}, keeping first"
+                        )
+                    continue
+                seen_leg_votes[leg_id] = v[vote_type_key]
+                deduped_legislator_votes.append(v)
+            row["legislatorVotes"] = deduped_legislator_votes
+
             counts = {
                 "YES": 0,
                 "NO": 0,
