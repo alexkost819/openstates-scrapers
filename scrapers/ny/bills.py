@@ -536,7 +536,7 @@ class NYBillScraper(Scraper):
                         .strip(),
                         div.xpath('string(div[@class="name"])').strip(),
                     )
-                    for div in table.xpath('//div[@class="vote-name"]')
+                    for div in table.xpath('.//div[@class="vote-name"]')
                 ]
 
                 vote_dictionary = {
