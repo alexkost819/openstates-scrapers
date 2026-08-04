@@ -24,34 +24,34 @@ example is a real excerpt, trimmed but otherwise verbatim.
 | DE | declared counts vs. roll disagree (small) |
 | FL | declared counts vs. roll disagree (small) |
 | GA | declared counts vs. roll disagree (small) |
-| HI | garbled placeholder name; split-off initial fragment |
+| HI | garbled placeholder name; split-off initial fragment (fixed) |
 | IA | declared counts vs. roll disagree (small) |
 | ID | partial (exceptions-only) roll; two legislators share a bare surname |
 | IL | declared counts vs. roll disagree (small); literal duplicate vote-event record |
 | KY | declared counts vs. roll disagree (small) |
 | MA | declared counts vs. roll disagree (small) |
 | ME | literal duplicate vote-event record |
-| MI | partial (exceptions-only) roll; whole roll duplicated within one record |
+| MI | partial (exceptions-only) roll; whole roll duplicated within one record (fixed) |
 | MN | literal duplicate vote-event record |
-| MT | whole roll duplicated within one record |
+| MT | whole roll duplicated within one record (fixed) |
 | NC | declared counts vs. roll disagree (small) |
 | NH | declared counts vs. roll disagree; literal duplicate vote-event record |
-| NJ | whole roll duplicated within one record |
+| NJ | whole roll duplicated within one record (fixed) |
 | NM | literal duplicate vote-event record |
-| NY | whole roll duplicated within one record; duplicate/conflicting per-voter rows |
+| NY | whole roll duplicated within one record; duplicate/conflicting per-voter rows (fixed) |
 | OK | declared counts vs. roll disagree (small) |
-| OR | whole roll duplicated within one record |
+| OR | whole roll duplicated within one record (fixed) |
 | PA | declared counts vs. roll disagree; literal duplicate vote-event record |
 | RI | declared counts vs. roll disagree (small); literal duplicate vote-event record |
 | SC | declared counts vs. roll disagree (small) |
 | SD | literal duplicate vote-event record |
 | TN | partial (exceptions-only) roll |
-| TX | partial (exceptions-only) roll; garbled/truncated voter names; literal duplicate vote-event record |
+| TX | partial (exceptions-only) roll; garbled/truncated voter names (fixed); literal duplicate vote-event record |
 | VA | literal duplicate vote-event record |
 | VT | declared counts vs. roll disagree (small); same vote republished under two roll-call reference numbers |
 | WA | declared counts vs. roll disagree (large, 18 voters) |
 | WI | declared counts vs. roll disagree (small); literal duplicate vote-event record |
-| WY | split-off initial fragment |
+| WY | split-off initial fragment (fixed) |
 
 ## AZ
 
@@ -737,7 +737,7 @@ Declared `counts` vs. roll disagree by 2. From
 Also produces a literal duplicate vote-event record — see the
 [Duplicate vote-event records](#duplicate-vote-event-records) section.
 
-## WY
+## WY — FIXED
 
 **A legislator's middle initial split into its own roll entry.** From
 `WY/2026/WY_2026_bills.json`, a House roll for the FY26 budget bill (HB
