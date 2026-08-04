@@ -354,9 +354,13 @@ class MIBillScraper(Scraper):
                     if line.strip():
                         if session == "2017-2018":
                             for leg in line.split():
-                                results[vtype].append(leg)
+                                # journal occasionally repeats a name within
+                                # the same roll call; keep first occurrence
+                                if leg not in results[vtype]:
+                                    results[vtype].append(leg)
                         else:
-                            results[vtype].append(line)
+                            if line not in results[vtype]:
+                                results[vtype].append(line)
             else:
                 self.warning("piece without vtype set: %s", p)
 

@@ -222,7 +222,7 @@ itemizes 7 (labeled "not voting" in the roll, a category the declared
 Produces a literal duplicate vote-event record — see the
 [Duplicate vote-event records](#duplicate-vote-event-records) section.
 
-## MI
+## MI — PARTIALLY FIXED
 
 Two distinct issues:
 
@@ -270,6 +270,15 @@ name appears exactly twice (105 distinct legislators):
 ```
 
 Same pattern as NY, MT, NJ, and OR below.
+
+**Fixed** (whole-roll-duplication issue only; the partial-roll issue is a
+source-data gap and left as-is, same as the analogous TX/ID/TN cases).
+`parse_roll_call` in `scrapers/mi/bills.py` now skips a name if it's
+already been recorded for the current vote type within the current roll
+call, first occurrence wins. Verified with a standalone script
+reproducing the documented shape (105 distinct legislators each appearing
+twice within one "Yeas" journal line) and confirming the dedupe collapses
+it to 105.
 
 ## MN
 
