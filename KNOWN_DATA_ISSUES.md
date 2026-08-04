@@ -116,7 +116,7 @@ split-initial fragment at first glance, matching the WY/HI pattern below,
 but Georgia's House does have a member surnamed Au — ruled out as a false
 positive, not a data-quality issue.)
 
-## HI
+## HI — PARTIALLY FIXED
 
 Two distinct issues, both in voter-identity fields:
 
@@ -152,6 +152,17 @@ to introduce a list, e.g. "Senator(s) X, Y voting no"), not a name.
 `"C"` is almost certainly the middle initial of the "Lee" entry
 immediately before it, landed in its own roll entry instead of the name.
 See WY below for the same pattern at larger scale.
+
+**Fixed** (initial-fragmentation issue only; the garbled `"Senator(s"`
+placeholder is a source-data gap with no way to reconstruct the intended
+name, and is left as-is). `split_specific_votes` in `scrapers/hi/bills.py`
+now merges any comma-split fragment matching a bare initial (`^[A-Z]\.?$`)
+into the name before it, since such a fragment can never legitimately be a
+standalone surname. Verified with a standalone script
+(`split_specific_votes` copied out, no repo deps needed) against the exact
+documented input `"Lee, C., Inouye"`, which now correctly produces
+`["Lee, C.", "Inouye"]` instead of `["Lee", "C", "Inouye"]`; a normal
+multi-name string is unaffected.
 
 ## IA
 

@@ -76,7 +76,17 @@ def split_specific_votes(voters):
     elif voters.startswith("Representative(s)"):
         voters = voters.replace("Representative(s)", "")
     # Remove trailing spaces and semicolons
-    return (v.rstrip(" ;") for v in voters.split(", "))
+    names = [v.rstrip(" ;") for v in voters.split(", ")]
+    # a middle initial (e.g. "Lee, C., Inouye" -> "Lee", "C", "Inouye")
+    # is not a name on its own; a bare initial can never be a legislator's
+    # only/last name, so merge it back into the name before it
+    merged = []
+    for name in names:
+        if merged and re.fullmatch(r"[A-Z]\.?", name):
+            merged[-1] = f"{merged[-1]}, {name}"
+        else:
+            merged.append(name)
+    return merged
 
 
 class HIBillScraper(Scraper):
