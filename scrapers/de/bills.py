@@ -4,6 +4,7 @@ import json
 from json.decoder import JSONDecodeError
 from requests.exceptions import JSONDecodeError as RequestsJSONDecodeError
 import random
+import re
 import time
 from urllib.parse import urljoin
 
@@ -280,6 +281,10 @@ class DEBillScraper(Scraper, LXMLMixin):
 
         self.scrape_actions(bill, row["LegislationId"])
 
+        # Fall back to the bill detail HTML when the actions API is empty.
+        if not bill.actions:
+            self.scrape_fallback_actions_from_html(bill, html)
+
         if row["HasAmendments"] is True:
             self.scrape_amendments(bill, row["LegislationId"])
 
@@ -336,6 +341,7 @@ class DEBillScraper(Scraper, LXMLMixin):
             allow_redirects=True,
             verify=False,
             headers=self.headers,
+            timeout=self.timeout,
         ).content
 
         page = json.loads(page)
@@ -362,6 +368,7 @@ class DEBillScraper(Scraper, LXMLMixin):
             allow_redirects=True,
             verify=False,
             headers=self.headers,
+            timeout=self.timeout,
         )
         page = self.decode_and_retry_request(
             "scrape_votes", request_method, retries=1, raise_exception=False
@@ -384,6 +391,7 @@ class DEBillScraper(Scraper, LXMLMixin):
             allow_redirects=True,
             verify=False,
             headers=self.headers,
+            timeout=self.timeout,
         )
         page = self.decode_and_retry_request(
             "scrape_vote", request_method, retries=1, raise_exception=False
@@ -503,14 +511,11 @@ class DEBillScraper(Scraper, LXMLMixin):
             allow_redirects=True,
             verify=False,
             headers=self.headers,
+            timeout=self.timeout,
         )
         page = self.decode_and_retry_request(
             "scrape_actions", request_method, raise_exception=False
         )
-        # DE sometimes returns an empty body for a bill's actions (notably for
-        # very recently introduced bills). Treat that as "no actions yet" rather
-        # than a fatal failure, so the bill is still imported. Actions will
-        # backfill automatically once DE's endpoint returns data.
         if not page:
             self.warning(f"No actions returned for {bill.identifier}")
             return
@@ -547,6 +552,96 @@ class DEBillScraper(Scraper, LXMLMixin):
             for c in categorization["committees"]:
                 action.add_related_entity(c, "organization")
 
+    def scrape_fallback_actions_from_html(self, bill, html):
+        """Add actions from the bill detail HTML when the actions API is empty.
+
+        Only called when ``scrape_actions()`` did not add anything.
+        """
+        home_chamber = "upper" if bill.identifier.startswith("S") else "lower"
+
+        # "Introduced on: 6/30/26" -> description="Introduced", date=6/30/26
+        introduced_values = html.xpath(
+            '//label[@class="info-label" and '
+            'starts-with(normalize-space(text()), "Introduced on")]'
+            "/following-sibling::div[1]/text()"
+        )
+        if introduced_values:
+            intro_text = introduced_values[0].strip()
+            intro_date = self._parse_de_short_date(intro_text)
+            if intro_date:
+                bill.add_action(
+                    description="Introduced",
+                    date=intro_date,
+                    chamber=home_chamber,
+                    classification=["introduction"],
+                )
+
+        # "Status: House Natural Resources & Energy 6/30/26"
+        # -> description="House Natural Resources & Energy", date=6/30/26
+        status_values = html.xpath(
+            '//label[@class="info-label" and '
+            'normalize-space(text())="Status:"]'
+            "/following-sibling::div[1]/text()"
+        )
+        if status_values:
+            status_text = status_values[0].strip()
+            # Split off a trailing M/D/YY (or M/D/YYYY) date.
+            match = re.search(r"\s+(\d{1,2}/\d{1,2}/\d{2,4})\s*$", status_text)
+            if match:
+                status_date = self._parse_de_short_date(match.group(1))
+                description = status_text[: match.start()].strip()
+                if status_date and description:
+                    # Status text is "{Chamber} {Committee Name}". Rewrite it to
+                    # match the categorizer's referral-committee rule.
+                    chamber_word = None
+                    if description.startswith("Senate"):
+                        action_chamber = "upper"
+                        chamber_word = "Senate"
+                    elif description.startswith("House"):
+                        action_chamber = "lower"
+                        chamber_word = "House"
+                    elif "Governor" in description:
+                        action_chamber = "executive"
+                    else:
+                        action_chamber = home_chamber
+
+                    if chamber_word:
+                        committee_name = description[len(chamber_word) :].strip()
+                        if committee_name:
+                            description = (
+                                f"Assigned to {committee_name} "
+                                f"Committee in {chamber_word}"
+                            )
+
+                    categorization = self.categorizer.categorize(description)
+                    action = bill.add_action(
+                        description=description,
+                        date=status_date,
+                        chamber=action_chamber,
+                        classification=categorization["classification"],
+                    )
+                    for leg in categorization["legislators"]:
+                        action.add_related_entity(leg, "person")
+                    for c in categorization["committees"]:
+                        action.add_related_entity(c, "organization")
+
+    def _parse_de_short_date(self, text):
+        """Parse DE's short date strings (e.g. "6/30/26") into YYYY-MM-DD.
+
+        Returns ``None`` if the string can't be parsed, so callers can skip
+        adding a malformed action rather than crashing the whole scrape.
+        """
+        text = (text or "").strip()
+        if not text:
+            return None
+        for fmt in ("%m/%d/%y", "%m/%d/%Y"):
+            try:
+                return dt.datetime.strptime(text, fmt).strftime("%Y-%m-%d")
+            except ValueError:
+                continue
+        self.warning(f"Could not parse DE fallback action date: {text!r}")
+        return None
+
     def scrape_amendments(self, bill, legislation_id):
         # http://legis.delaware.gov/json/BillDetail/GetRelatedAmendmentsByLegislationId?legislationId=47185
         amds_url = (
@@ -562,6 +657,7 @@ class DEBillScraper(Scraper, LXMLMixin):
             allow_redirects=True,
             verify=False,
             headers=self.headers,
+            timeout=self.timeout,
         )
         page = self.decode_and_retry_request("scrape_amendments", request_method)
 
@@ -642,6 +738,7 @@ class DEBillScraper(Scraper, LXMLMixin):
             allow_redirects=True,
             verify=False,
             headers=self.headers,
+            timeout=self.timeout,
         )
         return response
 
