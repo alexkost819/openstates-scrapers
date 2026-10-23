@@ -15,6 +15,8 @@ _categorizer_rules = (
     Rule(r"^Introduced", "introduction"),
     Rule(r"Enrolled Adopted", "enrolled"),
     Rule(r"^Inexpedient", "failure"),
+    Rule(r"^Died on Table", "failure"),
+    Rule(r"^Indefinitely Postpone.*\bMA\b", "failure"),
     Rule(r"Withdraws Floor Amendment", "amendment-withdrawal"),
     Rule(r"Refer to Interim Study", "referral"),
     Rule(r"^(?!.*Committee Report).*[Rr]eferred [Tt]o.*$", "referral-committee"),
