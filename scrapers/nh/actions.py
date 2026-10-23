@@ -3,9 +3,14 @@ from utils.actions import Rule, BaseCategorizer
 # These are regex patterns that map to action categories.
 _categorizer_rules = (
     Rule(r"Minority Committee Report", None),  # avoid calling these passage
-    Rule(r"^Ought to Pass", ["passage"]),
+    # floor vote on the committee report: the House passes the bill when the
+    # motion carries (MA), the Senate when it also orders third reading (OT3rdg)
+    Rule(r"^Ought to Pass.*(: MA [A-Z]|\bMA\b.*OT3rdg)", ["passage"]),
     Rule(r"Passed by Third Reading", ["reading-3", "passage"]),
-    Rule(r".*Ought to Pass", ["committee-passage-favorable"]),
+    Rule(
+        r"^(Majority )?Committee Report: Ought to Pass", ["committee-passage-favorable"]
+    ),
+    Rule(r"^Ought to Pass.*Refer to Finance", "referral-committee"),
     Rule(r".*Introduced(.*) and (R|r)eferred", ["introduction", "referral-committee"]),
     Rule(r"Proposed(.*) Amendment", "amendment-introduction"),
     Rule(r"Amendment .* Adopted", "amendment-passage"),
