@@ -67,6 +67,19 @@ def extract_amendment_id(action):
         return piece[0]
 
 
+def action_date(action, timestamp):
+    """
+    Docket.txt's timestamp is when the entry was posted, which can be days
+    before or after the floor action. Prefer the date cited with the journal
+    page ("03/11/2026  HJ 7", "05/14/2026;  SJ 12"), except on "in recess"
+    entries, where that is the date of the recessed session.
+    """
+    match = re.search(r"(\d{1,2}/\d{1,2}/\d{4})[;,]?\s+[HS]J \d", action)
+    if match and "recess" not in action.lower():
+        return dt.datetime.strptime(match.group(1), "%m/%d/%Y")
+    return dt.datetime.strptime(timestamp, "%m/%d/%Y %H:%M:%S %p")
+
+
 class NHBillScraper(Scraper):
     cachebreaker = dt.datetime.now().strftime("%Y%d%d%H%I%s")
     categorizer = Categorizer()
@@ -589,8 +602,8 @@ class NHBillScraper(Scraper):
 
             if session_yr == session and lsr in self.bills:
                 actor = "lower" if body == "H" else "upper"
-                time = dt.datetime.strptime(timestamp, "%m/%d/%Y %H:%M:%S %p")
                 action = action.strip()
+                time = action_date(action, timestamp)
                 action_attr = self.categorizer.categorize(action)
                 classification = action_attr["classification"]
 
