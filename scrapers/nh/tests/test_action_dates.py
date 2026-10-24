@@ -1,7 +1,7 @@
 """
 Run directly: `python3 -m scrapers.nh.tests.test_action_dates`
 """
-from ..bills import action_date
+from ..bills import action_date, journal_dates
 
 
 def test_action_dates():
@@ -59,5 +59,23 @@ def test_action_dates():
     )
 
 
+def test_floor_votes_take_journal_date():
+    hj8 = "Ought to Pass: MA VV 03/12/2026  HJ 8  P. 3"
+    typo = "Inexpedient to Legislate: MF RC 165-176 03/13/2026  HJ 8  P. 90"
+    consent = "Removed from Consent (Reps. A, B) 03/10/2026  HJ 8  P. 1"
+    carry_over = "Ought to Pass: MA VV 03/13/2025  HJ 8  P. 12"
+    journals = journal_dates([hj8, hj8, typo, consent, carry_over])
+
+    def date(action):
+        return action_date(action, "3/16/2026 12:00:00 AM", journals).strftime(
+            "%Y-%m-%d"
+        )
+
+    assert date(typo) == "2026-03-12"
+    assert date(consent) == "2026-03-10"
+    assert date(carry_over) == "2025-03-13"
+
+
 if __name__ == "__main__":
+    test_floor_votes_take_journal_date()
     test_action_dates()

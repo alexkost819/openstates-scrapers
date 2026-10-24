@@ -1,6 +1,6 @@
 import re
 import datetime as dt
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 import pytz
 
@@ -67,18 +67,42 @@ def extract_amendment_id(action):
         return piece[0]
 
 
-def action_date(action, timestamp):
+JOURNAL_CITE = re.compile(r"(\d{1,2}/\d{1,2}/(\d{4}))[;,]?\s+([HS]J \d+)")
+
+
+def journal_cite(action):
+    match = JOURNAL_CITE.search(action)
+    if match and "recess" not in action.lower():
+        return match.group(1), (match.group(3), match.group(2))
+    return None, None
+
+
+def journal_dates(actions):
+    """Most-cited date for each journal, keyed like ("HJ 8", "2026")."""
+    counts = defaultdict(Counter)
+    for action in actions:
+        date, journal = journal_cite(action)
+        if date:
+            counts[journal][date] += 1
+    return {journal: c.most_common(1)[0][0] for journal, c in counts.items()}
+
+
+def action_date(action, timestamp, journals=None):
     """
     Docket.txt's timestamp is when the entry was posted, which can be days
     before or after the floor action. Prefer the date cited with the journal
     page ("03/11/2026  HJ 7", "05/14/2026;  SJ 12"), except on "in recess"
     entries, where that is the date of the recessed session, and on journal
     dates weeks after posting, which are clerk typos ("09/19/2026  HJ 16").
+    A floor vote (MA/MF) takes its journal's date, since the clerk's date is
+    sometimes a day off ("03/13/2026  HJ 8" on the 03/12 journal).
     """
     posted = dt.datetime.strptime(timestamp, "%m/%d/%Y %H:%M:%S %p")
-    match = re.search(r"(\d{1,2}/\d{1,2}/\d{4})[;,]?\s+[HS]J \d", action)
-    if match and "recess" not in action.lower():
-        journal = dt.datetime.strptime(match.group(1), "%m/%d/%Y")
+    date, journal = journal_cite(action)
+    if date:
+        if re.search(r"\b(MA|MF)\b", action):
+            date = (journals or {}).get(journal, date)
+        journal = dt.datetime.strptime(date, "%m/%d/%Y")
         if journal <= posted + dt.timedelta(days=14):
             return journal
     return posted
@@ -630,6 +654,11 @@ class NHBillScraper(Scraper):
             .content.decode("utf-8")
             .split("\n")
         )
+        journals = journal_dates(
+            line.split("|")[5]
+            for line in action_lines
+            if line.count("|") == 6 and line.split("|")[0].lstrip("\ufeff") == session
+        )
         for line in action_lines:
             if len(line) < 1:
                 continue
@@ -642,7 +671,7 @@ class NHBillScraper(Scraper):
             if session_yr == session and lsr in self.bills:
                 actor = "lower" if body == "H" else "upper"
                 action = action.strip()
-                time = action_date(action, timestamp)
+                time = action_date(action, timestamp, journals)
                 action_attr = self.categorizer.categorize(action)
                 classification = action_attr["classification"]
 
