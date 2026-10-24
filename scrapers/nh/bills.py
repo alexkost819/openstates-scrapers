@@ -158,7 +158,7 @@ class NHBillScraper(Scraper):
 
         docket_page = lxml.html.fromstring(docket_content)
         version_elems = docket_page.xpath(
-            "//table[@id='Table1']//a[contains(@href, 'billtext.aspx') or contains(@href, 'billText.aspx')]"
+            "//table[contains(@class, 'docket-table')]//a[contains(@href, 'billtext.aspx') or contains(@href, 'billText.aspx')]"
         )
         version_urls_seen = []
         for version_elem in version_elems:
@@ -168,7 +168,10 @@ class NHBillScraper(Scraper):
                 continue
             else:
                 version_urls_seen.append(version_url)
-            version_text = version_elem.xpath(".//text()")[0]
+            version_text = version_elem.text_content().replace(
+                "(opens in new window)", ""
+            )
+            version_text = re.sub(r"#\s+", "#", version_text).strip()
             if "txtFormat=html" in version_url:
                 # "normal" version (maybe always Introduced?)
                 bill.add_version_link(
@@ -208,6 +211,12 @@ class NHBillScraper(Scraper):
                 self.logger.warning(
                     f"Found an unexpected version URL on {docket_url}, version URL: {version_url}"
                 )
+
+        # the bill text links carry the bill's billinfo.aspx id
+        for version_url in version_urls_seen:
+            match = re.search(r"[?&]id=(\d+)(&|$)", version_url)
+            if "txtFormat=html" in version_url and match:
+                return match.group(1)
 
     def scrape_sponsors_from_bill_page(self, bill, bill_page):
         """
@@ -490,17 +499,26 @@ class NHBillScraper(Scraper):
                         self.scrape_versions_from_web_2026(self.bills[lsr], bill_page)
                         self.scrape_sponsors_from_bill_page(self.bills[lsr], bill_page)
                     else:
-                        self.warning(
-                            f"Missing version_id for {bill_id}, can't build bill page"
-                        )
-                        self.bills[lsr].add_source(
-                            "https://gc.nh.gov/bill_Status/advanced.aspx"
-                        )
                         # Bill's LSR is missing from the bulk-data dump (e.g. a
                         # carryover bill from a prior session year) — fall back
                         # to the docket page, which can be queried by LSR + session
                         # year directly, to still capture version/document links.
-                        self.scrape_versions_from_docket(self.bills[lsr], lsr, session)
+                        version_id = self.scrape_versions_from_docket(
+                            self.bills[lsr], lsr, session
+                        )
+                        if version_id:
+                            self.add_source(self.bills[lsr], version_id)
+                            bill_page = self.get_bill_page(version_id)
+                            self.scrape_sponsors_from_bill_page(
+                                self.bills[lsr], bill_page
+                            )
+                        else:
+                            self.warning(
+                                f"Missing version_id for {bill_id}, can't build bill page"
+                            )
+                            self.bills[lsr].add_source(
+                                "https://gc.nh.gov/bill_Status/advanced.aspx"
+                            )
 
         # load legislators
         self.legislators = {}
