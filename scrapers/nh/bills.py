@@ -80,6 +80,23 @@ def action_date(action, timestamp):
     return dt.datetime.strptime(timestamp, "%m/%d/%Y %H:%M:%S %p")
 
 
+def unmark_referred_passage(actions):
+    """
+    A House floor vote on an Ought to Pass report that is then referred to
+    Finance or Ways and Means (House Rule 47) isn't passage; the floor vote
+    after that committee reports is.
+    """
+    for vote, referral in zip(actions, actions[1:]):
+        if (
+            "passage" in vote["classification"]
+            and '"lower"' in vote["organization_id"]
+            and re.match(
+                r"Referred to (Finance|Ways and Means)", referral["description"]
+            )
+        ):
+            vote["classification"].remove("passage")
+
+
 class NHBillScraper(Scraper):
     cachebreaker = dt.datetime.now().strftime("%Y%d%d%H%I%s")
     categorizer = Categorizer()
@@ -644,6 +661,7 @@ class NHBillScraper(Scraper):
 
         # save all bills
         for bill in self.bills:
+            unmark_referred_passage(self.bills[bill].actions)
             yield self.bills[bill]
 
     def add_source(self, bill: Bill, id: str):
