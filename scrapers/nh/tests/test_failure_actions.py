@@ -24,6 +24,23 @@ def test_failure_actions():
     assert classify(
         "Lay HB609 on Table (Rep. Wilhelm): MA RC 182-160 06/04/2026  HJ 15  P. 29"
     ) == ["deferral"]
+    assert (
+        classify(
+            "Lay HB1361 on Table (Rep. Hill): MF DV 160-178 03/12/2026  HJ 8  P. 33"
+        )
+        == []
+    )
+    assert classify("Sen. Gray Moved Laid on Table, MA, VV; 03/26/2026;  SJ 7") == [
+        "deferral"
+    ]
+    assert classify("Inexpedient to Legislate: MA VV 02/19/2026  HJ 5  P. 3") == [
+        "failure"
+    ]
+    assert classify(
+        "Inexpedient to Legislate, Senate Rule 3-23, 10/31/2025;  SJ 1"
+    ) == ["failure"]
+    assert classify("Inexpedient to Legislate: MF RC 165-176 03/12/2026  HJ 8") == []
+    assert classify("Inexpedient to Legislate, MF, VV; 03/26/2026;  SJ 7") == []
 
 
 if __name__ == "__main__":
