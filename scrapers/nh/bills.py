@@ -72,12 +72,16 @@ def action_date(action, timestamp):
     Docket.txt's timestamp is when the entry was posted, which can be days
     before or after the floor action. Prefer the date cited with the journal
     page ("03/11/2026  HJ 7", "05/14/2026;  SJ 12"), except on "in recess"
-    entries, where that is the date of the recessed session.
+    entries, where that is the date of the recessed session, and on journal
+    dates weeks after posting, which are clerk typos ("09/19/2026  HJ 16").
     """
+    posted = dt.datetime.strptime(timestamp, "%m/%d/%Y %H:%M:%S %p")
     match = re.search(r"(\d{1,2}/\d{1,2}/\d{4})[;,]?\s+[HS]J \d", action)
     if match and "recess" not in action.lower():
-        return dt.datetime.strptime(match.group(1), "%m/%d/%Y")
-    return dt.datetime.strptime(timestamp, "%m/%d/%Y %H:%M:%S %p")
+        journal = dt.datetime.strptime(match.group(1), "%m/%d/%Y")
+        if journal <= posted + dt.timedelta(days=14):
+            return journal
+    return posted
 
 
 def unmark_referred_passage(actions):

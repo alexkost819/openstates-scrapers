@@ -50,6 +50,13 @@ def test_action_dates():
         )
         == "2026-04-15"
     )
+    assert (
+        date(
+            "Reconsider HB1491 (Rep. N. Germana): MF VV 09/19/2026  HJ 16  P. 48",
+            "8/19/2026 2:27:49 PM",
+        )
+        == "2026-08-19"
+    )
 
 
 if __name__ == "__main__":
