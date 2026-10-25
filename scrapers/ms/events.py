@@ -102,7 +102,15 @@ class SenateAgendaPdf(PdfPage):
                         after_description = match.group(2)
                         event_title = f"{event_title} ({after_description.strip()})"
                     else:
-                        start_time = dateutil.parser.parse(start_time)
+                        try:
+                            start_time = dateutil.parser.parse(start_time)
+                        except dateutil.parser.ParserError:
+                            self.logger.warning(
+                                f"skipping event with unparseable start {start_time!r}"
+                            )
+                            event = None
+                            i += 4
+                            continue
                         start_time = TZ.localize(start_time)
 
                 # if we wiped the time component due to regex replacements, "AR", etc.
@@ -122,7 +130,7 @@ class SenateAgendaPdf(PdfPage):
                 event.add_committee(committee)
                 match_coordinates(event, {"400 High St": (32.30404, -90.18141)})
                 i += 4
-            elif bill_re.match(lines[i]):
+            elif event and bill_re.match(lines[i]):
                 # Bill id found
                 alpha, num = bill_re.match(lines[i]).groups(1)
                 # Remove "." and " " from "S. B."
