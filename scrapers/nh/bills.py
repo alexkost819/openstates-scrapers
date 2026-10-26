@@ -321,6 +321,24 @@ class NHBillScraper(Scraper):
         if added == 0:
             self.warning(f"No sponsors found on bill page for {bill.identifier}")
 
+    def scrape_sponsors_from_legacy_page(self, bill, lsr, session):
+        """
+        Some bill pages list no sponsors, e.g. when the prime sponsor has left
+        the House and dropped out of legislators.txt. The legacy bill status
+        page still names them.
+        """
+        url = f"https://gc.nh.gov/bill_status/legacy/bs2016/bill_status.aspx?lsr={lsr}&sy={session}&sortoption=&txtsessionyear={session}"
+        page = lxml.html.fromstring(self.get(url, verify=False).content)
+        for sponsor in page.xpath("//ul[@class='sponsor-list']/li"):
+            name = sponsor.xpath("./span[1]")[0].text_content().strip()
+            is_primary = bool(sponsor.xpath(".//*[contains(@class, 'prime')]"))
+            bill.add_sponsorship(
+                classification="primary" if is_primary else "cosponsor",
+                name=name,
+                entity_type="person",
+                primary=is_primary,
+            )
+
     def scrape_from_web(self, session):
         bills = {}
 
@@ -694,6 +712,15 @@ class NHBillScraper(Scraper):
 
         # save all bills
         for bill in self.bills:
+            if not self.bills[bill].sponsorships:
+                try:
+                    self.scrape_sponsors_from_legacy_page(
+                        self.bills[bill], bill, session
+                    )
+                except Exception as e:
+                    self.warning(
+                        f"Failed to scrape sponsors from legacy page for LSR {bill}: {e}"
+                    )
             unmark_referred_passage(self.bills[bill].actions)
             yield self.bills[bill]
 
